@@ -203,7 +203,6 @@ export class LocalStore {
 
   /** Performs any initial startup actions required by the local store. */
   start(): Promise<void> {
-    // TODO(multitab): Ensure that we in fact don't need the primary lease.
     return this.persistence.runTransaction('Start LocalStore', false, txn => {
       return this.startMutationQueue(txn)
         .next(() => this.startQueryCache(txn))
@@ -286,6 +285,10 @@ export class LocalStore {
   private startMutationQueue(
     txn: PersistenceTransaction
   ): PersistencePromise<void> {
+    // Note: The cleanup in this method runs without a primary lease, but this
+    // is fine since all tabs store all mutations that they are interested in
+    // in local memory. It is therefore always ok to drop all acknowledged
+    // mutation batches.
     return this.mutationQueue
       .start(txn)
       .next(() => {
@@ -466,7 +469,7 @@ export class LocalStore {
   getLastStreamToken(): Promise<ProtoByteString> {
     return this.persistence.runTransaction(
       'Get last stream token',
-      false, // TODO(multitab): This requires the owner lease
+      false,
       txn => {
         return this.mutationQueue.getLastStreamToken(txn);
       }
