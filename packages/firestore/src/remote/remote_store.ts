@@ -233,6 +233,9 @@ export class RemoteStore implements TargetMetadataProvider {
     } else if (this.watchStream.isOpen()) {
       this.sendWatchRequest(queryData);
     }
+
+    // If we have any listens, the stream should be marked active.
+    this.watchStream.markActive();
   }
 
   /** Removes the listen from server */
@@ -244,9 +247,10 @@ export class RemoteStore implements TargetMetadataProvider {
     delete this.listenTargets[targetId];
     if (this.watchStream.isOpen()) {
       this.sendUnwatchRequest(targetId);
-      if (objUtils.isEmpty(this.listenTargets)) {
-        this.watchStream.markIdle();
-      }
+    }
+
+    if (objUtils.isEmpty(this.listenTargets)) {
+      this.watchStream.markIdle();
     }
   }
 
@@ -298,7 +302,7 @@ export class RemoteStore implements TargetMetadataProvider {
     return (
       this.canUseNetwork() &&
       !this.watchStream.isStarted() &&
-      !objUtils.isEmpty(this.listenTargets)
+      (!objUtils.isEmpty(this.listenTargets) || this.watchStream.isIdle())
     );
   }
 
@@ -471,7 +475,7 @@ export class RemoteStore implements TargetMetadataProvider {
    * Starts the write stream if necessary.
    */
   async fillWritePipeline(): Promise<void> {
-    if (this.canAddToWritePipeline()) {
+    while (this.canAddToWritePipeline()) {
       const lastBatchIdRetrieved =
         this.writePipeline.length > 0
           ? this.writePipeline[this.writePipeline.length - 1].batchId
@@ -481,17 +485,19 @@ export class RemoteStore implements TargetMetadataProvider {
       );
 
       if (batch === null) {
-        if (this.writePipeline.length === 0) {
-          this.writeStream.markIdle();
-        }
-      } else {
-        this.addToWritePipeline(batch);
-        await this.fillWritePipeline();
+        break;
       }
+      this.addToWritePipeline(batch);
     }
 
     if (this.shouldStartWriteStream()) {
       this.startWriteStream();
+    }
+
+    if (this.writePipeline.length === 0) {
+      this.writeStream.markIdle();
+    } else {
+      this.writeStream.markActive();
     }
   }
 
@@ -530,7 +536,7 @@ export class RemoteStore implements TargetMetadataProvider {
     return (
       this.canUseNetwork() &&
       !this.writeStream.isStarted() &&
-      this.writePipeline.length > 0
+      (this.writePipeline.length > 0 || this.writeStream.isIdle())
     );
   }
 

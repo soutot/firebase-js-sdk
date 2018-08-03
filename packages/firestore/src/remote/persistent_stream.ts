@@ -242,6 +242,8 @@ export abstract class PersistentStream<
    * When stop returns, isStarted() and isOpen() will both return false.
    */
   async stop(): Promise<void> {
+    this.cancelIdleCheck();
+
     if (this.isStarted()) {
       await this.close(PersistentStreamState.Initial);
     }
@@ -263,40 +265,42 @@ export abstract class PersistentStream<
   }
 
   /**
-   * Marks this stream as idle. If no further actions are performed on the
-   * stream for one minute, the stream will automatically close itself and
-   * notify the stream's onClose() handler with Status.OK. The stream will then
-   * be in a !isStarted() state, requiring the caller to start the stream again
-   * before further use.
+   * Marks this stream as idle. After one minute the stream will automatically
+   * stop() itself unless markActive() or stop() is called first.
    *
-   * Only streams that are in state 'Open' can be marked idle, as all other
-   * states imply pending network operations.
+   * Note that stream errors do not cancel the idle timer, so a stream can be
+   * restarted while idle and the timer will continue unless the stream is
+   * marked active.
+   *
+   * While the timer is outstanding, isIdle() will return true.
    */
   markIdle(): void {
-    // Starts the idle time if we are in state 'Open' and are not yet already
-    // running a timer (in which case the previous idle timeout still applies).
-    if (this.isOpen() && this.idleTimer === null) {
+    // Starts the idle timer if we are not already running a timer (in which
+    // case the previous idle timeout still applies).
+    if (this.idleTimer === null) {
       this.idleTimer = this.queue.enqueueAfterDelay(
         this.idleTimerId,
         IDLE_TIMEOUT_MS,
-        () => this.handleIdleCloseTimer()
+        () => {
+          this.idleTimer = null;
+          return this.stop();
+        }
       );
     }
   }
 
-  /** Sends a message to the underlying stream. */
-  protected sendRequest(msg: SendType): void {
+  // TODO(mikelehen): comments.
+  markActive(): void {
     this.cancelIdleCheck();
-    this.stream!.send(msg);
   }
 
-  /** Called by the idle timer when the stream should close due to inactivity. */
-  private async handleIdleCloseTimer(): Promise<void> {
-    if (this.isOpen()) {
-      // When timing out an idle stream there's no reason to force the stream into backoff when
-      // it restarts so set the stream state to Initial instead of Error.
-      return this.close(PersistentStreamState.Initial);
-    }
+  isIdle(): boolean {
+    return this.idleTimer !== null;
+  }
+
+  /** Sends a message to the underlying stream. */
+  protected sendRequest(msg: SendType): void {
+    this.stream!.send(msg);
   }
 
   /** Marks the stream as active again. */
@@ -330,8 +334,7 @@ export abstract class PersistentStream<
       "Can't provide an error when not in an error state."
     );
 
-    // Cancel any outstanding timers (they're guaranteed not to execute).
-    this.cancelIdleCheck();
+    // Cancel backoff (it's guaranteed not to execute).
     this.backoff.cancel();
 
     // Invalidates any stream-related callbacks (e.g. from auth or the
