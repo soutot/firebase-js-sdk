@@ -63,7 +63,7 @@ describeSpec('Offline:', [], () => {
   });
 
   specTest(
-    'Removing all listeners delays "Offline" status on next listen',
+    'Offline client remains offline after removing all listeners',
     ['no-lru'],
     'Marked as no-lru because when a listen is re-added, it gets a new target id rather than reusing one',
     () => {
@@ -78,14 +78,24 @@ describeSpec('Offline:', [], () => {
             fromCache: true,
             hasPendingWrites: false
           })
-          // Remove listen.
+          // Remove listen.  The watch stream is no longer necessary.
           .userUnlistens(query)
-          // If the next (already scheduled) connection attempt fails, we'll move
-          // to unknown since there are no listeners, and stop trying to connect.
-          .watchStreamCloses(Code.UNAVAILABLE)
-          // Suppose sometime later we listen again, it should take two failures
-          // before we get cached data.
+
+          // We should remain in state "Offline" and return data from cache
+          // immediately (even though there are no active listeners) until the
+          // idle timeout elapses.
           .userListens(query)
+          .expectEvents(query, {
+            fromCache: true,
+            hasPendingWrites: false
+          })
+          .userUnlistens(query)
+
+          // Once the idle timeout fires, we'll return to state "Unknown" and
+          // stop returning data from cache until we get 2 stream failures.
+          .runTimer(TimerId.ListenStreamIdle)
+          .userListens(query)
+
           .watchStreamCloses(Code.UNAVAILABLE)
           .watchStreamCloses(Code.UNAVAILABLE)
           .expectEvents(query, {
