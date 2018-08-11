@@ -302,7 +302,8 @@ export class SetMutation extends Mutation {
     // have held.
 
     const version = Mutation.getPostMutationVersion(maybeDoc);
-    return new Document(this.key, version, this.value, {
+    const localVersion = mutationResult.version;
+    return new Document(this.key, version, localVersion, this.value, {
       hasLocalMutations: false
     });
   }
@@ -319,7 +320,7 @@ export class SetMutation extends Mutation {
     }
 
     const version = Mutation.getPostMutationVersion(maybeDoc);
-    return new Document(this.key, version, this.value, {
+    return new Document(this.key, version, SnapshotVersion.MIN, this.value, {
       hasLocalMutations: true
     });
   }
@@ -381,8 +382,9 @@ export class PatchMutation extends Mutation {
     }
 
     const version = Mutation.getPostMutationVersion(maybeDoc);
+    const localVersion = mutationResult.version;
     const newData = this.patchDocument(maybeDoc);
-    return new Document(this.key, version, newData, {
+    return new Document(this.key, version, localVersion, newData, {
       hasLocalMutations: false
     });
   }
@@ -400,7 +402,7 @@ export class PatchMutation extends Mutation {
 
     const version = Mutation.getPostMutationVersion(maybeDoc);
     const newData = this.patchDocument(maybeDoc);
-    return new Document(this.key, version, newData, {
+    return new Document(this.key, version, SnapshotVersion.MIN, newData, {
       hasLocalMutations: true
     });
   }
@@ -493,7 +495,8 @@ export class TransformMutation extends Mutation {
       mutationResult.transformResults!
     );
     const newData = this.transformObject(doc.data, transformResults);
-    return new Document(this.key, doc.version, newData, {
+    const localVersion = mutationResult.version;
+    return new Document(this.key, doc.version, localVersion, newData, {
       hasLocalMutations: false
     });
   }
@@ -515,7 +518,7 @@ export class TransformMutation extends Mutation {
       baseDoc
     );
     const newData = this.transformObject(doc.data, transformResults);
-    return new Document(this.key, doc.version, newData, {
+    return new Document(this.key, doc.version, SnapshotVersion.MIN, newData, {
       hasLocalMutations: true
     });
   }

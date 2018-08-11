@@ -27,17 +27,21 @@ export interface DocumentOptions {
 }
 
 export class Document {
-  readonly hasLocalMutations: boolean;
+  _hasLocalMutations: boolean;
 
   constructor(
     readonly key: DocumentKey,
     readonly version: SnapshotVersion,
+    readonly localVersion: SnapshotVersion,
     readonly data: ObjectValue,
     options: DocumentOptions
   ) {
-    this.hasLocalMutations = options.hasLocalMutations;
+    this._hasLocalMutations = options.hasLocalMutations;
   }
 
+  get hasLocalMutations() {
+    return this._hasLocalMutations;
+  }
   field(path: FieldPath): FieldValue | undefined {
     return this.data.field(path);
   }
@@ -51,11 +55,19 @@ export class Document {
     return this.data.value();
   }
 
+  hasPendingMutations(current: boolean) {
+    const pending =
+      this.hasLocalMutations ||
+      (current && this.localVersion.compareTo(this.version) > 0);
+    return pending;
+  }
+
   isEqual(other: Document | null | undefined): boolean {
     return (
       other instanceof Document &&
       this.key.isEqual(other.key) &&
       this.version.isEqual(other.version) &&
+      this.localVersion.isEqual(other.localVersion) &&
       this.data.isEqual(other.data) &&
       this.hasLocalMutations === other.hasLocalMutations
     );

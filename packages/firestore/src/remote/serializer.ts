@@ -70,6 +70,7 @@ import {
   ArrayUnionTransformOperation,
   ArrayRemoveTransformOperation
 } from '../model/transform_operation';
+import { DbTimestamp } from '../local/indexeddb_schema';
 
 const DIRECTIONS = (() => {
   const dirs: { [dir: string]: api.OrderDirection } = {};
@@ -527,10 +528,17 @@ export class JsonProtoSerializer {
     };
   }
 
-  fromDocument(document: api.Document): Document {
+  fromDocument(document: api.Document, localVersion: DbTimestamp): Document {
+    const timestamp = new Timestamp(
+      localVersion.seconds,
+      localVersion.nanoseconds
+    );
+    let localVersionTs = SnapshotVersion.fromTimestamp(timestamp);
+
     return new Document(
       this.fromName(document.name!),
       this.fromVersion(document.updateTime!),
+      localVersionTs,
       this.fromFields(document.fields || {}),
       { hasLocalMutations: false }
     );
@@ -578,7 +586,9 @@ export class JsonProtoSerializer {
     const key = this.fromName(doc.found!.name!);
     const version = this.fromVersion(doc.found!.updateTime!);
     const fields = this.fromFields(doc.found!.fields || {});
-    return new Document(key, version, fields, { hasLocalMutations: false });
+    return new Document(key, version, SnapshotVersion.MIN, fields, {
+      hasLocalMutations: false
+    });
   }
 
   private fromMissing(result: api.BatchGetDocumentsResponse): NoDocument {
@@ -723,7 +733,7 @@ export class JsonProtoSerializer {
       const key = this.fromName(entityChange.document!.name!);
       const version = this.fromVersion(entityChange.document!.updateTime!);
       const fields = this.fromFields(entityChange.document!.fields || {});
-      const doc = new Document(key, version, fields, {
+      const doc = new Document(key, version, SnapshotVersion.MIN, fields, {
         hasLocalMutations: false
       });
       const updatedTargetIds = entityChange.targetIds || [];

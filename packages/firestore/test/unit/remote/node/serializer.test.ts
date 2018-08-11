@@ -72,6 +72,7 @@ import {
   wrapObject
 } from '../../../util/helpers';
 import { loadProtos } from '../../../../src/platform_node/load_protos';
+import { DbTimestamp } from '../../../../src/local/indexeddb_schema';
 
 describe('Serializer', () => {
   const partition = new DatabaseId('p', 'd');
@@ -755,7 +756,9 @@ describe('Serializer', () => {
     };
     const serialized = s.toDocument(d);
     expect(serialized).to.deep.equal(proto);
-    expect(s.fromDocument(serialized).isEqual(d)).to.equal(true);
+    expect(
+      s.fromDocument(serialized, new DbTimestamp(0, 0)).isEqual(d)
+    ).to.equal(true);
   });
 
   describe('to/from RelationFilter', () => {

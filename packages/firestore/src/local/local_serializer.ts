@@ -43,7 +43,10 @@ export class LocalSerializer {
   /** Decodes a remote document from storage locally to a Document. */
   fromDbRemoteDocument(remoteDoc: DbRemoteDocument): MaybeDocument {
     if (remoteDoc.document) {
-      return this.remoteSerializer.fromDocument(remoteDoc.document);
+      return this.remoteSerializer.fromDocument(
+        remoteDoc.document,
+        remoteDoc.localVersion
+      );
     } else if (remoteDoc.noDocument) {
       const key = DocumentKey.fromSegments(remoteDoc.noDocument.path);
       const readTime = remoteDoc.noDocument.readTime;
@@ -58,7 +61,12 @@ export class LocalSerializer {
   toDbRemoteDocument(maybeDoc: MaybeDocument): DbRemoteDocument {
     if (maybeDoc instanceof Document) {
       const doc = this.remoteSerializer.toDocument(maybeDoc);
-      return new DbRemoteDocument(null, doc);
+      const timestamp = maybeDoc.localVersion.toTimestamp();
+      const localVersion = new DbTimestamp(
+        timestamp.seconds,
+        timestamp.nanoseconds
+      );
+      return new DbRemoteDocument(null, doc, localVersion);
     } else {
       const path = maybeDoc.key.path.toArray();
       const timestamp = maybeDoc.version.toTimestamp();

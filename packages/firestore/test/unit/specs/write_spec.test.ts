@@ -69,7 +69,7 @@ describeSpec('Writes:', [], () => {
         })
         .watchSends({ affects: [query] }, docBv2)
         .watchSnapshots(3000)
-        .writeAcks('collection/b', 3000)
+        .writeAcks('collection/b', 2500)
         .expectEvents(query, {
           metadata: [docBv2]
         });
@@ -105,6 +105,53 @@ describeSpec('Writes:', [], () => {
         .writeAcks('collection/key', 2000)
         .expectEvents(query1, {
           metadata: [doc1c]
+        });
+    }
+  );
+
+  specTest(
+    "Raises snapshot with 'hasPendingWrites' for unacknowledged write",
+    [],
+    () => {
+      const query1 = Query.atPath(path('collection'));
+      let pendingDoc = doc(
+        'collection/doc',
+        /* remoteVersion= */ 0,
+        /* localVersion= */ 0,
+        { v: 1 },
+        { hasLocalMutations: true }
+      );
+      return spec()
+        .withGCEnabled(false)
+        .userSets('collection/doc', { v: 1 })
+        .userListens(query1)
+        .expectEvents(query1, {
+          added: [pendingDoc],
+          fromCache: true,
+          hasPendingWrites: true
+        });
+    }
+  );
+
+  specTest(
+    "Doesn't raise 'hasPendingWrites' for acknowledged write and new listen",
+    [],
+    () => {
+      const query1 = Query.atPath(path('collection'));
+      let modifiedDoc = doc(
+        'collection/doc',
+        /* remoteVersion= */ 0,
+        /* localVersion= */ 1000,
+        { v: 1 }
+      );
+      return spec()
+        .withGCEnabled(false)
+        .userSets('collection/doc', { v: 1 })
+        .writeAcks('collection/doc', 1000)
+        .userListens(query1)
+        .expectEvents(query1, {
+          added: [modifiedDoc],
+          fromCache: true
         });
     }
   );
@@ -216,21 +263,116 @@ describeSpec('Writes:', [], () => {
     );
   });
 
+  specTest(
+    'Local patch is applied to query until watch catches up',
+    ['exclusive'],
+    () => {
+      const query = Query.atPath(path('collection'));
+
+      let docV1 = doc(
+        'collection/doc',
+        /* remoteVersion= */ 0,
+        /* localVersion= */ 0,
+        { local: 1 },
+        { hasLocalMutations: true }
+      );
+      let docV1Acknowledged = doc(
+        'collection/doc',
+        /* remoteVersion= */ 0,
+        /* localVersion= */ 1000,
+        { local: 1 }
+      );
+      let docV2 = doc(
+        'collection/doc',
+        /* remoteVersion= */ 2000,
+        /* localVersion= */ 0,
+        { local: 1, remote: 2 }
+      );
+      let docV3 = doc(
+        'collection/doc',
+        /* remoteVersion= */ 3000,
+        /* localVersion= */ 5000,
+        { local: 1, remote: 3 }
+      );
+      let docV4 = doc(
+        'collection/doc',
+        /* remoteVersion= */ 4000,
+        /* localVersion= */ 5000,
+        { local: 1, remote: 4 }
+      );
+      let docV5 = doc(
+        'collection/doc',
+        /* remoteVersion= */ 2000,
+        /* localVersion= */ 0,
+        { local: 5, remote: 2 },
+        { hasLocalMutations: true }
+      );
+      let docV5Acknowledged = doc(
+        'collection/doc',
+        /* remoteVersion= */ 5000,
+        /* localVersion= */
+        { local: 5, remote: 5 }
+      );
+
+      return (
+        spec()
+          .withGCEnabled(false)
+          .userSets('collection/doc', { local: 1 })
+          .userListens(query)
+          .expectEvents(query, {
+            added: [docV1],
+            fromCache: true,
+            hasPendingWrites: true
+          })
+          .writeAcks('collection/doc', 1000)
+          .expectEvents(query, {
+            metadata: [docV1Acknowledged],
+            fromCache: true
+          })
+          .watchAcksFull(query, 2000, docV2)
+          .expectEvents(query, {
+            modified: [docV2]
+          })
+          .userPatches('collection/doc', { local: 5 })
+          .expectEvents(query, {
+            hasPendingWrites: true,
+            modified: [docV5]
+          })
+          // The ack arrives before the watch snapshot; no events yet
+          .writeAcks('collection/doc', 5000)
+          // Watch sends some stale data; no events
+          .watchSends({ affects: [query] }, docV3)
+          .watchSnapshots(3000)
+          .watchSends({ affects: [query] }, docV4)
+          .watchSnapshots(4000)
+          // Watch catches up
+          .watchSends({ affects: [query] }, docV5Acknowledged)
+          .watchSnapshots(5000)
+          .expectEvents(query, {
+            modified: [docV5Acknowledged]
+          })
+      );
+    }
+  );
+
   specTest('Writes are pipelined', [], () => {
     const query = Query.atPath(path('collection'));
-    const docs: Document[] = [];
+    const committedDocs: Document[] = [];
+    const acknowledgedDocs: Document[] = [];
     const localDocs: Document[] = [];
     const numWrites = 15;
     for (let i = 0; i < numWrites; i++) {
-      const d = doc('collection/a' + i, (i + 1) * 1000, { v: 1 });
-      const dLocal = doc(
+      const localDoc = doc(
         'collection/a' + i,
         0,
         { v: 1 },
         { hasLocalMutations: true }
       );
-      docs.push(d);
-      localDocs.push(dLocal);
+      localDocs.push(localDoc);
+      const committedDoc = doc('collection/a' + i, 0, (i + 1) * 1000, { v: 1 });
+      committedDocs.push(committedDoc);
+      const acknowledgedDoc = doc('collection/a' + i, (i + 1) * 1000, { v: 1 });
+      acknowledgedDocs.push(acknowledgedDoc);
     }
 
     const specification = spec()
@@ -249,16 +391,29 @@ describeSpec('Writes:', [], () => {
     // should be queued up locally.  For now it's a constant in datastore.ts,
     // but in the future it should be negotiated with backend through the
     // the stream.
-    specification.expectNumOutstandingWrites(10);
+    specification.expectNumOutstandingWrites(Math.min(numWrites, 10));
     for (let i = 0; i < numWrites; i++) {
-      specification
-        .writeAcks('collection/a' + i, (i + 1) * 1000)
-        .watchSends({ affects: [query] }, docs[i])
-        .watchSnapshots((i + 1) * 1000)
-        .expectEvents(query, {
+      specification.writeAcks('collection/a' + i, (i + 1) * 1000);
+      if (i == 0) {
+        specification.expectEvents(query, {
           hasPendingWrites: i < numWrites - 1,
-          metadata: [docs[i]]
+          metadata: [committedDocs[i]],
+          fromCache: true
         });
+      }
+      specification
+        .watchSends({ affects: [query] }, acknowledgedDocs[i])
+        .watchSnapshots((i + 1) * 1000);
+
+      const hasPendingWrites = i < numWrites - 1;
+      if (i == 0) {
+        specification.expectEvents(query, { hasPendingWrites });
+      } else {
+        specification.expectEvents(query, {
+          metadata: [acknowledgedDocs[i]],
+          hasPendingWrites
+        });
+      }
     }
     return specification;
   });
@@ -446,9 +601,7 @@ describeSpec('Writes:', [], () => {
 
           // Finally watch catches up.
           .watchAcksFull(query, 2000, docA)
-          .expectEvents(query, {
-            metadata: [docA]
-          })
+          .expectEvents(query, {})
       );
     }
   );
@@ -571,7 +724,8 @@ describeSpec('Writes:', [], () => {
         { foo: 'bar' },
         { hasLocalMutations: true }
       );
-      const doc1b = doc('collection/key', 0, { foo: 'bar' });
+      const doc1b = doc('collection/key', 0, 1000, { foo: 'bar' });
+      const doc1c = doc('collection/key', 0, { foo: 'bar' });
 
       return spec()
         .userListens(query1)
@@ -585,13 +739,15 @@ describeSpec('Writes:', [], () => {
           expectUserCallback: false
         })
         .writeAcks('collection/key', 1000)
+        .expectEvents(query1, {
+          fromCache: true,
+          metadata: [doc1b]
+        })
         .watchAcks(query1)
-        .watchSends({ affects: [query1] }, doc1b)
+        .watchSends({ affects: [query1] }, doc1c)
         .watchCurrents(query1, 'resume-token-1000')
         .watchSnapshots(1000)
-        .expectEvents(query1, {
-          metadata: [doc1b]
-        });
+        .expectEvents(query1, {});
     });
   }
 
@@ -874,7 +1030,10 @@ describeSpec('Writes:', [], () => {
         })
         // Ack write but without a watch event.
         .writeAcks('collection/a', 1000, { expectUserCallback: false })
-        .client(1) // No events
+        .client(1)
+        .expectUserCallbacks({
+          acknowledged: ['collection/a']
+        })
         .client(0)
         // Watcher catches up.
         .watchSends({ affects: [query] }, docA)
@@ -882,11 +1041,56 @@ describeSpec('Writes:', [], () => {
         .expectEvents(query, {
           metadata: [docA]
         })
-        .client(1)
-        .expectUserCallbacks({
-          acknowledged: ['collection/a']
-        })
     );
+  });
+
+  specTest('Writes are held during primary failover', ['multi-client'], () => {
+    const query1 = Query.atPath(path('collection'));
+    const query2 = Query.atPath(path('collection/doc'));
+    const docV1 = doc(
+      'collection/doc',
+      0,
+      { v: 1 },
+      { hasLocalMutations: true }
+    );
+    const docV1Committed = doc('collection/doc', 0, 2000, { v: 1 });
+    const docV1Acknowledged = doc('collection/doc', 2000, { v: 1 });
+    return client(0)
+      .userListens(query1)
+      .userSets('collection/doc', { v: 1 })
+      .expectEvents(query1, {
+        hasPendingWrites: true,
+        added: [docV1],
+        fromCache: true
+      })
+      .watchAcksFull(query1, 1000)
+      .expectEvents(query1, {
+        hasPendingWrites: true
+      })
+      .writeAcks('collection/doc', 2000)
+
+      .client(1)
+      .stealPrimaryLease()
+      .expectListen(query1, 'resume-token-1000')
+      .userListens(query2)
+      .expectEvents(query2, {
+        added: [docV1Committed],
+        fromCache: true
+      })
+      .watchAcks(query1)
+      .watchAcks(query2)
+      .watchSends({ affects: [query1, query2] }, docV1Acknowledged)
+      .watchCurrents(query1, 'resume-token-2000')
+      .watchCurrents(query2, 'resume-token-2000')
+      .watchSnapshots(2000)
+      .expectEvents(query2, {})
+      .client(0)
+      .expectListen(query2)
+      .runTimer(TimerId.ClientMetadataRefresh)
+      .expectPrimaryState(false)
+      .expectEvents(query1, {
+        metadata: [docV1Acknowledged]
+      });
   });
 
   specTest('Write are sequenced by multiple clients', ['multi-client'], () => {
@@ -1136,6 +1340,7 @@ describeSpec('Writes:', [], () => {
       { k: 'a' },
       { hasLocalMutations: true }
     );
+    const docACommitted = doc('collection/a', 0, 1000, { k: 'a' });
     const docA = doc('collection/a', 1000, { k: 'a' });
 
     return client(0)
@@ -1150,8 +1355,12 @@ describeSpec('Writes:', [], () => {
       })
       .stealPrimaryLease()
       .writeAcks('collection/a', 1000, { expectUserCallback: false })
+      .expectEvents(query, {
+        metadata: [docACommitted],
+        fromCache: true
+      })
       .watchAcksFull(query, 1000, docA)
-      .expectEvents(query, { metadata: [docA] })
+      .expectEvents(query, {})
       .client(0)
       .expectUserCallbacks({
         acknowledged: ['collection/a']
@@ -1251,8 +1460,8 @@ describeSpec('Writes:', [], () => {
     ['multi-client'],
     () => {
       const query = Query.atPath(path('collection'));
-      const docA = doc('collection/a', 0, { k: 'a' });
-      const docB = doc('collection/b', 0, { k: 'b' });
+      const docA = doc('collection/a', 0, 1000, { k: 'a' });
+      const docB = doc('collection/b', 0, 2000, { k: 'b' });
 
       return client(0)
         .expectPrimaryState(true)

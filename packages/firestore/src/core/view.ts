@@ -155,7 +155,7 @@ export class View {
         }
         if (newDoc) {
           newDocumentSet = newDocumentSet.add(newDoc);
-          if (newDoc.hasLocalMutations) {
+          if (newDoc.hasPendingMutations(this.current)) {
             newMutatedKeys = newMutatedKeys.add(key);
           } else {
             newMutatedKeys = newMutatedKeys.delete(key);
@@ -170,7 +170,8 @@ export class View {
           const docsEqual = oldDoc.data.isEqual(newDoc.data);
           if (
             !docsEqual ||
-            oldDoc.hasLocalMutations !== newDoc.hasLocalMutations
+            oldDoc.hasPendingMutations(this.current) !==
+              newDoc.hasPendingMutations(this.current)
           ) {
             // only report a change if document actually changed
             if (docsEqual) {
@@ -323,7 +324,7 @@ export class View {
     // doesn't know that it's part of the query. So don't put it in limbo.
     // TODO(klimt): Ideally, we would only consider changes that might actually
     // affect this specific query.
-    if (this.documentSet.get(key)!.hasLocalMutations) {
+    if (this.documentSet.get(key)!.hasPendingMutations(this.current)) {
       return false;
     }
     // Everything else is in limbo.

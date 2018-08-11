@@ -1226,7 +1226,8 @@ export class DocumentSnapshot implements firestore.DocumentSnapshot {
 
   get metadata(): firestore.SnapshotMetadata {
     return new SnapshotMetadata(
-      this._document !== null && this._document.hasLocalMutations,
+      this._document !== null &&
+        this._document.hasPendingMutations(!this._fromCache),
       this._fromCache
     );
   }

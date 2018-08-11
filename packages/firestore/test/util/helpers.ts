@@ -111,13 +111,38 @@ export function ref(dbIdStr: string, keyStr: string): DocumentKeyReference {
 
 export function doc(
   keyStr: string,
-  ver: TestSnapshotVersion,
-  json: JsonObject<AnyJs>,
-  options: DocumentOptions = {
-    hasLocalMutations: false
-  }
+  remoteVersion: TestSnapshotVersion,
+  localVersionOrJson: TestSnapshotVersion | JsonObject<AnyJs>,
+  jsonOrOptions?: JsonObject<AnyJs> | DocumentOptions,
+  options?: DocumentOptions
 ): Document {
-  return new Document(key(keyStr), version(ver), wrapObject(json), options);
+  let _localVersion;
+  let _json;
+  let _options;
+
+  if (typeof localVersionOrJson === 'number') {
+    _localVersion = localVersionOrJson;
+    _json = jsonOrOptions;
+    _options = options;
+  } else {
+    _localVersion = 0;
+    _json = localVersionOrJson;
+    _options = jsonOrOptions;
+  }
+
+  if (!_options) {
+    _options = {
+      hasLocalMutations: false
+    };
+  }
+
+  return new Document(
+    key(keyStr),
+    version(remoteVersion),
+    version(_localVersion),
+    wrapObject(_json),
+    _options
+  );
 }
 
 export function deletedDoc(

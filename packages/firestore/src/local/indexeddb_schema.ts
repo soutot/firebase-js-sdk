@@ -24,6 +24,10 @@ import { encode, EncodedResourcePath } from './encoded_resource_path';
 import { SimpleDbTransaction } from './simple_db';
 import { PersistencePromise } from './persistence_promise';
 import { SnapshotVersion } from '../core/snapshot_version';
+import { BATCHID_UNKNOWN } from '../model/mutation_batch';
+import { IndexedDbMutationQueue } from './indexeddb_mutation_queue';
+import { LocalSerializer } from './local_serializer';
+import { JsonProtoSerializer } from '../remote/serializer';
 
 /**
  * Schema Version for the Web client:
@@ -35,8 +39,9 @@ import { SnapshotVersion } from '../core/snapshot_version';
  *    to limbo resolution. Addresses
  *    https://github.com/firebase/firebase-ios-sdk/issues/1548
  * 4. Multi-Tab Support.
+ * 5. Removal of held write acks.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * Performs database creation and schema upgrades.
@@ -92,6 +97,10 @@ export function createOrUpgradeDb(
       createClientMetadataStore(db);
       createRemoteDocumentChangesStore(db);
     });
+  }
+
+  if (fromVersion < 5 && toVersion >= 5) {
+    p = p.next(() => removeAcknowledgedMutations(db, txn));
   }
 
   return p;
@@ -295,6 +304,52 @@ function upgradeMutationBatchSchemaAndMigrateData(
   });
 }
 
+function removeAcknowledgedMutations(
+  db: IDBDatabase,
+  txn: SimpleDbTransaction
+): PersistencePromise<void> {
+  const queuesStore = txn.store<DbMutationQueueKey, DbMutationQueue>(
+    DbMutationQueue.store
+  );
+  const mutationsStore = txn.store<[string, number], DbMutationBatch>(
+    DbMutationBatch.store
+  );
+
+  const serializer = new LocalSerializer(
+    new JsonProtoSerializer(/* databaseId=*/ undefined, {
+      useProto3Json: true
+    })
+  );
+
+  return queuesStore.loadAll().next(queues => {
+    const promises = [];
+    for (const queue of queues) {
+      const mutationQueue = new IndexedDbMutationQueue(
+        queue.userId,
+        serializer
+      );
+
+      const range = IDBKeyRange.bound(
+        [this.userId, BATCHID_UNKNOWN],
+        [this.userId, queue.lastAcknowledgedBatchId]
+      );
+      const p = mutationsStore.loadAll(range).next(dbBatches => {
+        let removeP = PersistencePromise.resolve();
+        for (const dbBatch of dbBatches) {
+          const batch = serializer.fromDbMutationBatch(dbBatch);
+          removeP = removeP.next(() =>
+            mutationQueue.removeMutationBatch(txn, batch)
+          );
+        }
+        return removeP;
+      });
+
+      promises.push(p);
+    }
+    return PersistencePromise.waitFor(promises);
+  });
+}
+
 /**
  * An object to be stored in the 'documentMutations' store in IndexedDb.
  *
@@ -386,7 +441,8 @@ export class DbRemoteDocument {
      * Set to an instance of a Document if there's a cached version of the
      * document.
      */
-    public document: api.Document | null
+    public document: api.Document | null,
+    public localVersion?: DbTimestamp
   ) {}
 }
 

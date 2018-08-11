@@ -428,8 +428,7 @@ abstract class TestRunner {
     this.localStore = new LocalStore(
       this.persistence,
       this.user,
-      garbageCollector,
-      this.sharedClientState
+      garbageCollector
     );
 
     this.connection = new MockConnection(this.queue);
@@ -719,10 +718,15 @@ abstract class TestRunner {
         });
       });
     } else if (watchEntity.doc) {
-      const [key, version, data] = watchEntity.doc;
-      const document = data
-        ? doc(key, version, data)
-        : deletedDoc(key, version);
+      const document = watchEntity.doc.value
+        ? doc(
+            watchEntity.doc.key,
+            watchEntity.doc.version,
+            watchEntity.doc.localVersion,
+            watchEntity.doc.value,
+            watchEntity.doc.options
+          )
+        : deletedDoc(watchEntity.doc.key, watchEntity.doc.version);
       const change = new DocumentWatchChange(
         watchEntity.targets || [],
         watchEntity.removedTargets || [],
@@ -907,18 +911,18 @@ abstract class TestRunner {
         stepExpectations.length,
         'Number of expected and actual events mismatch'
       );
-      const actualEventsSorted = this.eventList.sort((a, b) =>
+      this.eventList.sort((a, b) =>
         primitiveComparator(a.query.canonicalId(), b.query.canonicalId())
       );
-      const expectedEventsSorted = stepExpectations.sort((a, b) =>
+      stepExpectations.sort((a, b) =>
         primitiveComparator(
           this.parseQuery(a.query).canonicalId(),
           this.parseQuery(b.query).canonicalId()
         )
       );
-      for (let i = 0; i < expectedEventsSorted.length; i++) {
-        const actual = actualEventsSorted[i];
-        const expected = expectedEventsSorted[i];
+      for (let i = 0; i < stepExpectations.length; i++) {
+        const actual = this.eventList[i];
+        const expected = stepExpectations[i];
         this.validateWatchExpectation(expected, actual);
       }
     } else {
@@ -1138,11 +1142,17 @@ abstract class TestRunner {
     type: ChangeType,
     change: SpecDocument
   ): DocumentViewChange {
-    const options = change.splice(3);
-    const docOptions: DocumentOptions = {
-      hasLocalMutations: options.indexOf('local') !== -1
+    const options = change.options || { hasLocalMutations: false };
+    return {
+      type,
+      doc: doc(
+        change.key,
+        change.version,
+        change.localVersion || 0,
+        change.value,
+        options
+      )
     };
-    return { type, doc: doc(change[0], change[1], change[2], docOptions) };
   }
 }
 
@@ -1489,11 +1499,13 @@ export interface SpecQuery {
  * Doc options are:
  *   'local': document has local modifications
  */
-export type SpecDocument = [
-  string,
-  TestSnapshotVersion,
-  JsonObject<AnyJs> | null
-];
+export interface SpecDocument {
+  key: string;
+  version: TestSnapshotVersion;
+  localVersion?: TestSnapshotVersion;
+  value: JsonObject<AnyJs> | null;
+  options?: DocumentOptions;
+}
 
 export interface SpecExpectation {
   query: SpecQuery;
