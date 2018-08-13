@@ -269,7 +269,7 @@ describeSpec('Writes:', [], () => {
     () => {
       const query = Query.atPath(path('collection'));
 
-      let docV1 = doc(
+      let docV1Local = doc(
         'collection/doc',
         /* remoteVersion= */ 0,
         /* localVersion= */ 0,
@@ -288,6 +288,13 @@ describeSpec('Writes:', [], () => {
         /* localVersion= */ 0,
         { local: 1, remote: 2 }
       );
+      let docV2Local = doc(
+          'collection/doc',
+          /* remoteVersion= */ 2000,
+          /* localVersion= */ 0,
+          { local: 5, remote: 2 },
+          { hasLocalMutations: true }
+      );
       let docV3 = doc(
         'collection/doc',
         /* remoteVersion= */ 3000,
@@ -299,13 +306,6 @@ describeSpec('Writes:', [], () => {
         /* remoteVersion= */ 4000,
         /* localVersion= */ 5000,
         { local: 1, remote: 4 }
-      );
-      let docV5 = doc(
-        'collection/doc',
-        /* remoteVersion= */ 2000,
-        /* localVersion= */ 0,
-        { local: 5, remote: 2 },
-        { hasLocalMutations: true }
       );
       let docV5Acknowledged = doc(
         'collection/doc',
@@ -320,7 +320,7 @@ describeSpec('Writes:', [], () => {
           .userSets('collection/doc', { local: 1 })
           .userListens(query)
           .expectEvents(query, {
-            added: [docV1],
+            added: [docV1Local],
             fromCache: true,
             hasPendingWrites: true
           })
@@ -336,7 +336,7 @@ describeSpec('Writes:', [], () => {
           .userPatches('collection/doc', { local: 5 })
           .expectEvents(query, {
             hasPendingWrites: true,
-            modified: [docV5]
+            modified: [docV2Local]
           })
           // The ack arrives before the watch snapshot; no events yet
           .writeAcks('collection/doc', 5000)
