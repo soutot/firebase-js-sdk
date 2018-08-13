@@ -500,7 +500,7 @@ export class LocalStore {
             ) {
               if (
                 existingDoc instanceof Document &&
-                existingDoc.localVersion != SnapshotVersion.MIN &&
+                existingDoc.localVersion !== SnapshotVersion.MIN &&
                 doc.version.compareTo(existingDoc.localVersion) < 0
               ) {
               } else {

@@ -33,7 +33,8 @@ import {
   deleteMutation,
   doc,
   field,
-  key, mutatedDoc,
+  key,
+  mutatedDoc,
   mutationResult,
   patchMutation,
   setMutation,
@@ -386,7 +387,7 @@ describe('Mutation', () => {
     );
 
     expect(transformedDoc).to.deep.equal(
-        mutatedDoc(
+      mutatedDoc(
         'collection/key',
         0,
         1,
@@ -412,7 +413,7 @@ describe('Mutation', () => {
     );
 
     expect(transformedDoc).to.deep.equal(
-        mutatedDoc(
+      mutatedDoc(
         'collection/key',
         0,
         1,
@@ -437,7 +438,7 @@ describe('Mutation', () => {
     const setResult = mutationResult(4);
     const setDoc = docSet.applyToRemoteDocument(baseDoc, setResult);
     expect(setDoc).to.deep.equal(
-        mutatedDoc(
+      mutatedDoc(
         'collection/key',
         0,
         4,

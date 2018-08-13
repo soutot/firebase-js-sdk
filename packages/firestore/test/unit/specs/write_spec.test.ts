@@ -17,7 +17,7 @@
 import { Query } from '../../../src/core/query';
 import { Document } from '../../../src/model/document';
 import { Code } from '../../../src/util/error';
-import {doc, mutatedDoc, path} from '../../util/helpers';
+import { doc, mutatedDoc, path } from '../../util/helpers';
 
 import { describeSpec, specTest } from './describe_spec';
 import { client, spec } from './spec_builder';
@@ -114,7 +114,7 @@ describeSpec('Writes:', [], () => {
     [],
     () => {
       const query1 = Query.atPath(path('collection'));
-      let pendingDoc = doc(
+      const pendingDoc = doc(
         'collection/doc',
         /* remoteVersion= */ 0,
         { v: 1 },
@@ -137,7 +137,7 @@ describeSpec('Writes:', [], () => {
     [],
     () => {
       const query1 = Query.atPath(path('collection'));
-      let modifiedDoc = mutatedDoc(
+      const modifiedDoc = mutatedDoc(
         'collection/doc',
         /* remoteVersion= */ 0,
         /* localVersion= */ 1000,
@@ -262,94 +262,89 @@ describeSpec('Writes:', [], () => {
     );
   });
 
-  specTest(
-    'Local patch is applied to query until watch catches up',
-    [],
-    () => {
-      const query = Query.atPath(path('collection'));
+  specTest('Local patch is applied to query until watch catches up', [], () => {
+    const query = Query.atPath(path('collection'));
 
-      let docV1Local = doc(
-        'collection/doc',
-        /* remoteVersion= */ 0,
-        { local: 1 },
-        { hasLocalMutations: true }
-      );
-      let docV1Acknowledged = mutatedDoc(
-        'collection/doc',
-        /* remoteVersion= */ 0,
-        /* localVersion= */ 1000,
-        { local: 1 }
-      );
-      let docV2 = doc(
-        'collection/doc',
-        /* remoteVersion= */ 2000,
-        { local: 1, remote: 2 }
-      );
-      let docV2Local = doc(
-          'collection/doc',
-          /* remoteVersion= */ 2000,
-          { local: 5, remote: 2 },
-          { hasLocalMutations: true }
-      );
-      let docV3 = mutatedDoc(
-        'collection/doc',
-        /* remoteVersion= */ 3000,
-        /* localVersion= */ 5000,
-        { local: 1, remote: 3 }
-      );
-      let docV4 = mutatedDoc(
-        'collection/doc',
-        /* remoteVersion= */ 4000,
-        /* localVersion= */ 5000,
-        { local: 1, remote: 4 }
-      );
-      let docV5Acknowledged = doc(
-        'collection/doc',
-        /* remoteVersion= */ 5000,
-        /* localVersion= */
-        { local: 5, remote: 5 }
-      );
+    const docV1Local = doc(
+      'collection/doc',
+      /* remoteVersion= */ 0,
+      { local: 1 },
+      { hasLocalMutations: true }
+    );
+    const docV1Acknowledged = mutatedDoc(
+      'collection/doc',
+      /* remoteVersion= */ 0,
+      /* localVersion= */ 1000,
+      { local: 1 }
+    );
+    const docV2 = doc('collection/doc', /* remoteVersion= */ 2000, {
+      local: 1,
+      remote: 2
+    });
+    const docV2Local = doc(
+      'collection/doc',
+      /* remoteVersion= */ 2000,
+      { local: 5, remote: 2 },
+      { hasLocalMutations: true }
+    );
+    const docV3 = mutatedDoc(
+      'collection/doc',
+      /* remoteVersion= */ 3000,
+      /* localVersion= */ 5000,
+      { local: 1, remote: 3 }
+    );
+    const docV4 = mutatedDoc(
+      'collection/doc',
+      /* remoteVersion= */ 4000,
+      /* localVersion= */ 5000,
+      { local: 1, remote: 4 }
+    );
+    const docV5Acknowledged = doc(
+      'collection/doc',
+      /* remoteVersion= */ 5000,
+      /* localVersion= */
+      { local: 5, remote: 5 }
+    );
 
-      return (
-        spec()
-          .withGCEnabled(false)
-          .userSets('collection/doc', { local: 1 })
-          .userListens(query)
-          .expectEvents(query, {
-            added: [docV1Local],
-            fromCache: true,
-            hasPendingWrites: true
-          })
-          .writeAcks('collection/doc', 1000)
-          .expectEvents(query, {
-            metadata: [docV1Acknowledged],
-            fromCache: true
-          })
-          .watchAcksFull(query, 2000, docV2)
-          .expectEvents(query, {
-            modified: [docV2]
-          })
-          .userPatches('collection/doc', { local: 5 })
-          .expectEvents(query, {
-            hasPendingWrites: true,
-            modified: [docV2Local]
-          })
-          // The ack arrives before the watch snapshot; no events yet
-          .writeAcks('collection/doc', 5000)
-          // Watch sends some stale data; no events
-          .watchSends({ affects: [query] }, docV3)
-          .watchSnapshots(3000)
-          .watchSends({ affects: [query] }, docV4)
-          .watchSnapshots(4000)
-          // Watch catches up
-          .watchSends({ affects: [query] }, docV5Acknowledged)
-          .watchSnapshots(5000)
-          .expectEvents(query, {
-            modified: [docV5Acknowledged]
-          })
-      );
-    }
-  );
+    return (
+      spec()
+        .withGCEnabled(false)
+        .userSets('collection/doc', { local: 1 })
+        .userListens(query)
+        .expectEvents(query, {
+          added: [docV1Local],
+          fromCache: true,
+          hasPendingWrites: true
+        })
+        .writeAcks('collection/doc', 1000)
+        .expectEvents(query, {
+          metadata: [docV1Acknowledged],
+          fromCache: true
+        })
+        .watchAcksFull(query, 2000, docV2)
+        .expectEvents(query, {
+          modified: [docV2]
+        })
+        .userPatches('collection/doc', { local: 5 })
+        .expectEvents(query, {
+          hasPendingWrites: true,
+          modified: [docV2Local]
+        })
+        // The ack arrives before the watch snapshot; no events yet
+        .writeAcks('collection/doc', 5000)
+        // Watch sends some stale data; no events
+        .watchSends({ affects: [query] }, docV3)
+        .watchSnapshots(3000)
+        .watchSends({ affects: [query] }, docV4)
+        .watchSnapshots(4000)
+        // Watch catches up
+        .watchSends({ affects: [query] }, docV5Acknowledged)
+        .watchSnapshots(5000)
+        .expectEvents(query, {
+          modified: [docV5Acknowledged]
+        })
+    );
+  });
 
   specTest('Writes are pipelined', [], () => {
     const query = Query.atPath(path('collection'));
@@ -365,7 +360,9 @@ describeSpec('Writes:', [], () => {
         { hasLocalMutations: true }
       );
       localDocs.push(localDoc);
-      const committedDoc = mutatedDoc('collection/a' + i, 0, (i + 1) * 1000, { v: 1 });
+      const committedDoc = mutatedDoc('collection/a' + i, 0, (i + 1) * 1000, {
+        v: 1
+      });
       committedDocs.push(committedDoc);
       const acknowledgedDoc = doc('collection/a' + i, (i + 1) * 1000, { v: 1 });
       acknowledgedDocs.push(acknowledgedDoc);
@@ -390,7 +387,7 @@ describeSpec('Writes:', [], () => {
     specification.expectNumOutstandingWrites(Math.min(numWrites, 10));
     for (let i = 0; i < numWrites; i++) {
       specification.writeAcks('collection/a' + i, (i + 1) * 1000);
-      if (i == 0) {
+      if (i === 0) {
         specification.expectEvents(query, {
           hasPendingWrites: i < numWrites - 1,
           metadata: [committedDocs[i]],
@@ -402,7 +399,7 @@ describeSpec('Writes:', [], () => {
         .watchSnapshots((i + 1) * 1000);
 
       const hasPendingWrites = i < numWrites - 1;
-      if (i == 0) {
+      if (i === 0) {
         specification.expectEvents(query, { hasPendingWrites });
       } else {
         specification.expectEvents(query, {

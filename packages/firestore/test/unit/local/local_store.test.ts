@@ -58,7 +58,8 @@ import {
   expectEqual,
   key,
   localViewChanges,
-  mapAsArray, mutatedDoc,
+  mapAsArray,
+  mutatedDoc,
   patchMutation,
   path,
   setMutation,
@@ -67,7 +68,6 @@ import {
 } from '../../util/helpers';
 
 import * as persistenceHelpers from './persistence_test_helpers';
-import { MemorySharedClientState } from '../../../src/local/shared_client_state';
 
 class LocalStoreTester {
   private promiseChain: Promise<void> = Promise.resolve();

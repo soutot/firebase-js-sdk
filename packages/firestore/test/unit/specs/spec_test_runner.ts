@@ -84,7 +84,6 @@ import { Deferred, sequence } from '../../../src/util/promise';
 import {
   deletedDoc,
   deleteMutation,
-  doc,
   filter,
   key,
   orderBy,
@@ -93,7 +92,8 @@ import {
   setMutation,
   TestSnapshotVersion,
   version,
-  expectFirestoreError, mutatedDoc
+  expectFirestoreError,
+  mutatedDoc
 } from '../../util/helpers';
 import {
   ClientId,

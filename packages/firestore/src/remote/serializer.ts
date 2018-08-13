@@ -533,7 +533,7 @@ export class JsonProtoSerializer {
       localVersion.seconds,
       localVersion.nanoseconds
     );
-    let localVersionTs = SnapshotVersion.fromTimestamp(timestamp);
+    const localVersionTs = SnapshotVersion.fromTimestamp(timestamp);
 
     return new Document(
       this.fromName(document.name!),

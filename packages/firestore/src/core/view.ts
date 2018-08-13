@@ -125,6 +125,8 @@ export class View {
     let newDocumentSet = oldDocumentSet;
     let needsRefill = false;
 
+    console.log('computeDocChanges current? ' + this.current);
+
     // Track the last doc in a (full) limit. This is necessary, because some
     // update (a delete, or an update moving a doc past the old limit) might
     // mean there is some other document in the local cache that either should
@@ -175,9 +177,18 @@ export class View {
           ) {
             // only report a change if document actually changed
             if (docsEqual) {
+              console.log('track1a');
               changeSet.track({ type: ChangeType.Metadata, doc: newDoc });
             } else {
-              changeSet.track({ type: ChangeType.Modified, doc: newDoc });
+              if (
+                newDoc.hasPendingMutations(this.current) &&
+                oldDoc.hasPendingMutations(true) &&
+                oldDoc.hasLocalMutations &&
+                !newDoc.hasLocalMutations
+              ) {
+              } else {
+                changeSet.track({ type: ChangeType.Modified, doc: newDoc });
+              }
             }
 
             if (

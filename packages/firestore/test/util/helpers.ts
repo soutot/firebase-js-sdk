@@ -115,7 +115,8 @@ export function doc(
   json: JsonObject<AnyJs>,
   options: DocumentOptions = {
     hasLocalMutations: false
-  }) {
+  }
+): Document {
   return new Document(
     key(keyStr),
     version(remoteVersion),
@@ -126,22 +127,22 @@ export function doc(
 }
 
 export function mutatedDoc(
-    keyStr: string,
-    remoteVersion: TestSnapshotVersion,
-    localVersion: TestSnapshotVersion,
-    json: JsonObject<AnyJs>,
-    options: DocumentOptions = {
-      hasLocalMutations: false
-    }): Document {
+  keyStr: string,
+  remoteVersion: TestSnapshotVersion,
+  localVersion: TestSnapshotVersion,
+  json: JsonObject<AnyJs>,
+  options: DocumentOptions = {
+    hasLocalMutations: false
+  }
+): Document {
   return new Document(
-      key(keyStr),
-      version(remoteVersion),
-      version(localVersion),
-      wrapObject(json),
-      options
+    key(keyStr),
+    version(remoteVersion),
+    version(localVersion),
+    wrapObject(json),
+    options
   );
 }
-
 
 export function deletedDoc(
   keyStr: string,

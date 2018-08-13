@@ -15,7 +15,7 @@
  */
 
 import { Query } from '../../../src/core/query';
-import {doc, mutatedDoc, path} from '../../util/helpers';
+import { doc, mutatedDoc, path } from '../../util/helpers';
 
 import { describeSpec, specTest } from './describe_spec';
 import { client, spec } from './spec_builder';
