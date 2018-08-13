@@ -93,7 +93,7 @@ import {
   setMutation,
   TestSnapshotVersion,
   version,
-  expectFirestoreError
+  expectFirestoreError, mutatedDoc
 } from '../../util/helpers';
 import {
   ClientId,
@@ -719,7 +719,7 @@ abstract class TestRunner {
       });
     } else if (watchEntity.doc) {
       const document = watchEntity.doc.value
-        ? doc(
+        ? mutatedDoc(
             watchEntity.doc.key,
             watchEntity.doc.version,
             watchEntity.doc.localVersion,
@@ -1145,7 +1145,7 @@ abstract class TestRunner {
     const options = change.options || { hasLocalMutations: false };
     return {
       type,
-      doc: doc(
+      doc: mutatedDoc(
         change.key,
         change.version,
         change.localVersion || 0,

@@ -112,38 +112,36 @@ export function ref(dbIdStr: string, keyStr: string): DocumentKeyReference {
 export function doc(
   keyStr: string,
   remoteVersion: TestSnapshotVersion,
-  localVersionOrJson: TestSnapshotVersion | JsonObject<AnyJs>,
-  jsonOrOptions?: JsonObject<AnyJs> | DocumentOptions,
-  options?: DocumentOptions
-): Document {
-  let _localVersion;
-  let _json;
-  let _options;
-
-  if (typeof localVersionOrJson === 'number') {
-    _localVersion = localVersionOrJson;
-    _json = jsonOrOptions;
-    _options = options;
-  } else {
-    _localVersion = 0;
-    _json = localVersionOrJson;
-    _options = jsonOrOptions;
-  }
-
-  if (!_options) {
-    _options = {
-      hasLocalMutations: false
-    };
-  }
-
+  json: JsonObject<AnyJs>,
+  options: DocumentOptions = {
+    hasLocalMutations: false
+  }) {
   return new Document(
     key(keyStr),
     version(remoteVersion),
-    version(_localVersion),
-    wrapObject(_json),
-    _options
+    version(0),
+    wrapObject(json),
+    options
   );
 }
+
+export function mutatedDoc(
+    keyStr: string,
+    remoteVersion: TestSnapshotVersion,
+    localVersion: TestSnapshotVersion,
+    json: JsonObject<AnyJs>,
+    options: DocumentOptions = {
+      hasLocalMutations: false
+    }): Document {
+  return new Document(
+      key(keyStr),
+      version(remoteVersion),
+      version(localVersion),
+      wrapObject(json),
+      options
+  );
+}
+
 
 export function deletedDoc(
   keyStr: string,

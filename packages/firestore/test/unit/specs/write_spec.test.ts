@@ -17,7 +17,7 @@
 import { Query } from '../../../src/core/query';
 import { Document } from '../../../src/model/document';
 import { Code } from '../../../src/util/error';
-import { doc, path } from '../../util/helpers';
+import {doc, mutatedDoc, path} from '../../util/helpers';
 
 import { describeSpec, specTest } from './describe_spec';
 import { client, spec } from './spec_builder';
@@ -117,7 +117,6 @@ describeSpec('Writes:', [], () => {
       let pendingDoc = doc(
         'collection/doc',
         /* remoteVersion= */ 0,
-        /* localVersion= */ 0,
         { v: 1 },
         { hasLocalMutations: true }
       );
@@ -138,7 +137,7 @@ describeSpec('Writes:', [], () => {
     [],
     () => {
       const query1 = Query.atPath(path('collection'));
-      let modifiedDoc = doc(
+      let modifiedDoc = mutatedDoc(
         'collection/doc',
         /* remoteVersion= */ 0,
         /* localVersion= */ 1000,
@@ -265,18 +264,17 @@ describeSpec('Writes:', [], () => {
 
   specTest(
     'Local patch is applied to query until watch catches up',
-    ['exclusive'],
+    [],
     () => {
       const query = Query.atPath(path('collection'));
 
       let docV1Local = doc(
         'collection/doc',
         /* remoteVersion= */ 0,
-        /* localVersion= */ 0,
         { local: 1 },
         { hasLocalMutations: true }
       );
-      let docV1Acknowledged = doc(
+      let docV1Acknowledged = mutatedDoc(
         'collection/doc',
         /* remoteVersion= */ 0,
         /* localVersion= */ 1000,
@@ -285,23 +283,21 @@ describeSpec('Writes:', [], () => {
       let docV2 = doc(
         'collection/doc',
         /* remoteVersion= */ 2000,
-        /* localVersion= */ 0,
         { local: 1, remote: 2 }
       );
       let docV2Local = doc(
           'collection/doc',
           /* remoteVersion= */ 2000,
-          /* localVersion= */ 0,
           { local: 5, remote: 2 },
           { hasLocalMutations: true }
       );
-      let docV3 = doc(
+      let docV3 = mutatedDoc(
         'collection/doc',
         /* remoteVersion= */ 3000,
         /* localVersion= */ 5000,
         { local: 1, remote: 3 }
       );
-      let docV4 = doc(
+      let docV4 = mutatedDoc(
         'collection/doc',
         /* remoteVersion= */ 4000,
         /* localVersion= */ 5000,
@@ -369,7 +365,7 @@ describeSpec('Writes:', [], () => {
         { hasLocalMutations: true }
       );
       localDocs.push(localDoc);
-      const committedDoc = doc('collection/a' + i, 0, (i + 1) * 1000, { v: 1 });
+      const committedDoc = mutatedDoc('collection/a' + i, 0, (i + 1) * 1000, { v: 1 });
       committedDocs.push(committedDoc);
       const acknowledgedDoc = doc('collection/a' + i, (i + 1) * 1000, { v: 1 });
       acknowledgedDocs.push(acknowledgedDoc);
@@ -724,7 +720,7 @@ describeSpec('Writes:', [], () => {
         { foo: 'bar' },
         { hasLocalMutations: true }
       );
-      const doc1b = doc('collection/key', 0, 1000, { foo: 'bar' });
+      const doc1b = mutatedDoc('collection/key', 0, 1000, { foo: 'bar' });
       const doc1c = doc('collection/key', 0, { foo: 'bar' });
 
       return spec()
@@ -1053,7 +1049,7 @@ describeSpec('Writes:', [], () => {
       { v: 1 },
       { hasLocalMutations: true }
     );
-    const docV1Committed = doc('collection/doc', 0, 2000, { v: 1 });
+    const docV1Committed = mutatedDoc('collection/doc', 0, 2000, { v: 1 });
     const docV1Acknowledged = doc('collection/doc', 2000, { v: 1 });
     return client(0)
       .userListens(query1)
@@ -1340,7 +1336,7 @@ describeSpec('Writes:', [], () => {
       { k: 'a' },
       { hasLocalMutations: true }
     );
-    const docACommitted = doc('collection/a', 0, 1000, { k: 'a' });
+    const docACommitted = mutatedDoc('collection/a', 0, 1000, { k: 'a' });
     const docA = doc('collection/a', 1000, { k: 'a' });
 
     return client(0)
@@ -1460,8 +1456,8 @@ describeSpec('Writes:', [], () => {
     ['multi-client'],
     () => {
       const query = Query.atPath(path('collection'));
-      const docA = doc('collection/a', 0, 1000, { k: 'a' });
-      const docB = doc('collection/b', 0, 2000, { k: 'b' });
+      const docA = mutatedDoc('collection/a', 0, 1000, { k: 'a' });
+      const docB = mutatedDoc('collection/b', 0, 2000, { k: 'b' });
 
       return client(0)
         .expectPrimaryState(true)

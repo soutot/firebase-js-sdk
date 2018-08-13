@@ -33,7 +33,7 @@ import {
   deleteMutation,
   doc,
   field,
-  key,
+  key, mutatedDoc,
   mutationResult,
   patchMutation,
   setMutation,
@@ -386,7 +386,7 @@ describe('Mutation', () => {
     );
 
     expect(transformedDoc).to.deep.equal(
-      doc(
+        mutatedDoc(
         'collection/key',
         0,
         1,
@@ -412,7 +412,7 @@ describe('Mutation', () => {
     );
 
     expect(transformedDoc).to.deep.equal(
-      doc(
+        mutatedDoc(
         'collection/key',
         0,
         1,
@@ -437,7 +437,7 @@ describe('Mutation', () => {
     const setResult = mutationResult(4);
     const setDoc = docSet.applyToRemoteDocument(baseDoc, setResult);
     expect(setDoc).to.deep.equal(
-      doc(
+        mutatedDoc(
         'collection/key',
         0,
         4,
@@ -454,7 +454,7 @@ describe('Mutation', () => {
     const result = mutationResult(5);
     const patchedDoc = mutation.applyToRemoteDocument(baseDoc, result);
     expect(patchedDoc).to.deep.equal(
-      doc(
+      mutatedDoc(
         'collection/key',
         0,
         5,
@@ -477,11 +477,11 @@ describe('Mutation', () => {
   }
 
   it('transitions versions correctly', () => {
-    const docV0Committed = doc('collection/key', 0, 7, {});
+    const docV0Committed = mutatedDoc('collection/key', 0, 7, {});
     const deletedV0 = deletedDoc('collection/key', 0);
 
     const docV3 = doc('collection/key', 3, {});
-    const docV3Committed = doc('collection/key', 3, 7, {});
+    const docV3Committed = mutatedDoc('collection/key', 3, 7, {});
     const deletedV3 = deletedDoc('collection/key', 3);
 
     const set = setMutation('collection/key', {});

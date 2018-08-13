@@ -58,7 +58,7 @@ import {
   expectEqual,
   key,
   localViewChanges,
-  mapAsArray,
+  mapAsArray, mutatedDoc,
   patchMutation,
   path,
   setMutation,
@@ -317,8 +317,8 @@ function genericLocalStoreTests(
       )
       .toContain(doc('foo/bar', 0, { foo: 'bar' }, { hasLocalMutations: true }))
       .afterAcknowledgingMutation({ documentVersion: 1 })
-      .toReturnChanged(doc('foo/bar', 0, 1, { foo: 'bar' }))
-      .toContain(doc('foo/bar', 0, 1, { foo: 'bar' }))
+      .toReturnChanged(mutatedDoc('foo/bar', 0, 1, { foo: 'bar' }))
+      .toContain(mutatedDoc('foo/bar', 0, 1, { foo: 'bar' }))
       .finish();
   });
 
@@ -356,14 +356,14 @@ function genericLocalStoreTests(
           )
           // Last seen version is zero, so this ack must be held.
           .afterAcknowledgingMutation({ documentVersion: 1 })
-          .toReturnChanged(doc('foo/bar', 0, 1, { foo: 'bar' }))
-          .toContain(doc('foo/bar', 0, 1, { foo: 'bar' }))
+          .toReturnChanged(mutatedDoc('foo/bar', 0, 1, { foo: 'bar' }))
+          .toContain(mutatedDoc('foo/bar', 0, 1, { foo: 'bar' }))
           .after(setMutation('bar/baz', { bar: 'baz' }))
           .toReturnChanged(
-            doc('bar/baz', 0, 0, { bar: 'baz' }, { hasLocalMutations: true })
+            doc('bar/baz', 0, { bar: 'baz' }, { hasLocalMutations: true })
           )
           .toContain(
-            doc('bar/baz', 0, 0, { bar: 'baz' }, { hasLocalMutations: true })
+            doc('bar/baz', 0, { bar: 'baz' }, { hasLocalMutations: true })
           )
           .afterRejectingMutation()
           .toReturnRemoved('bar/baz')
@@ -394,8 +394,8 @@ function genericLocalStoreTests(
       .toContain(doc('foo/bar', 0, { foo: 'bar' }, { hasLocalMutations: true }))
       .afterReleasingQuery(query)
       .afterAcknowledgingMutation({ documentVersion: 3 })
-      .toReturnChanged(doc('foo/bar', 0, 3, { foo: 'bar' }))
-      .toContain(doc('foo/bar', 0, 3, { foo: 'bar' }))
+      .toReturnChanged(mutatedDoc('foo/bar', 0, 3, { foo: 'bar' }))
+      .toContain(mutatedDoc('foo/bar', 0, 3, { foo: 'bar' }))
       .finish();
   });
 
@@ -432,8 +432,8 @@ function genericLocalStoreTests(
         )
         .afterAcknowledgingMutation({ documentVersion: 3 })
         // We haven't seen the remote event yet
-        .toReturnChanged(doc('foo/bar', 2, 3, { foo: 'bar' }))
-        .toContain(doc('foo/bar', 2, 3, { foo: 'bar' }))
+        .toReturnChanged(mutatedDoc('foo/bar', 2, 3, { foo: 'bar' }))
+        .toContain(mutatedDoc('foo/bar', 2, 3, { foo: 'bar' }))
         .after(docUpdateRemoteEvent(doc('foo/bar', 3, { it: 'changed' }), [2]))
         .toReturnChanged(doc('foo/bar', 3, { it: 'changed' }))
         .toContain(doc('foo/bar', 3, { it: 'changed' }))
@@ -477,7 +477,7 @@ function genericLocalStoreTests(
         )
       )
       .afterAcknowledgingMutation({ documentVersion: 2 })
-      .toReturnChanged(doc('foo/bar', 1, 2, { foo: 'bar', it: 'base' }))
+      .toReturnChanged(mutatedDoc('foo/bar', 1, 2, { foo: 'bar', it: 'base' }))
       .after(
         docUpdateRemoteEvent(doc('foo/bar', 2, { foo: 'bar', it: 'base' }), [2])
       )
@@ -605,8 +605,8 @@ function genericLocalStoreTests(
       )
       .toContain(doc('foo/bar', 1, { foo: 'bar' }, { hasLocalMutations: true }))
       .afterAcknowledgingMutation({ documentVersion: 3 }) // patch mutation
-      .toReturnChanged(doc('foo/bar', 1, 3, { foo: 'bar' }))
-      .toContain(doc('foo/bar', 1, 3, { foo: 'bar' }))
+      .toReturnChanged(mutatedDoc('foo/bar', 1, 3, { foo: 'bar' }))
+      .toContain(mutatedDoc('foo/bar', 1, 3, { foo: 'bar' }))
       .finish();
   });
 
@@ -627,12 +627,12 @@ function genericLocalStoreTests(
     return expectLocalStore()
       .after(setMutation('foo/bar', { foo: 'old' }))
       .afterAcknowledgingMutation({ documentVersion: 1 })
-      .toContain(doc('foo/bar', 0, 1, { foo: 'old' }))
+      .toContain(mutatedDoc('foo/bar', 0, 1, { foo: 'old' }))
       .after(patchMutation('foo/bar', { foo: 'bar' }))
       .toContain(doc('foo/bar', 0, { foo: 'bar' }, { hasLocalMutations: true }))
       .afterRejectingMutation()
-      .toReturnChanged(doc('foo/bar', 0, 1, { foo: 'old' }))
-      .toContain(doc('foo/bar', 0, 1, { foo: 'old' }))
+      .toReturnChanged(mutatedDoc('foo/bar', 0, 1, { foo: 'old' }))
+      .toContain(mutatedDoc('foo/bar', 0, 1, { foo: 'old' }))
       .finish();
   });
 
