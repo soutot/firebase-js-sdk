@@ -15,6 +15,7 @@
  */
 import * as errorsExports from './error';
 import { errors } from './error';
+import { atob, btoa } from './Base64';
 
 /**
  * @enum {string}
